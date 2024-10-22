@@ -9,21 +9,21 @@ const (
 	ADMIN ROLE = "ADMIN"
 )
 
-
 type User struct {
-	user_id int
-	name string
-	email string
-	password string
-	role ROLE 	
+	UserId int64 `json:"user_id"`
+	Name string `json:"name"`
+	Email string `json:"email"`
+	password string 
+	Role ROLE 	`json:"role"`
 }
 
 type Post struct {
-	post_id int
-	title string
-	body string
-	slug string
-	author_id int
-	created_at time.Time
-	updated_at time.Time
+	PostId int64 `json:"post_id"`
+	Title string `json:"title"`
+	Body string `json:"body"`
+	Slug string `json:"slug"`
+	AuthorId int64 `json:"author_id"`	
+	Author string `json:author`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

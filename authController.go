@@ -6,13 +6,6 @@ import (
 	"encoding/json"
 )
 
-type LoginUser struct {
-	UserId int64 `json:"user_id"`
-	Name string `json:"name"`
-	Email string `json:"email"`
-	password string 
-}
-
 func signup(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	name := r.FormValue("name")
@@ -61,17 +54,14 @@ func signup(w http.ResponseWriter, r *http.Request) {
 	session.Values[AUTH_COOKIE] = id
 	session.Save(r, w)
 	 
-	json.NewEncoder(w).Encode(LoginUser {Name:name, Email:email, UserId:id})
+	json.NewEncoder(w).Encode(User {Name:name, Email:email, UserId:id, Role: "USER"})
 }
 
 func handleLogin(w http.ResponseWriter, r * http.Request) {
+	email := r.FormValue("email")
+	password := r.FormValue("password")
 	
-	user := LoginUser{
-		Email :  r.FormValue("email"),
-		password :  r.FormValue("password"),
-	}
-	
-	if user.Email == "" || user.password == "" {
+	if email == "" || password == "" {
 		fmt.Fprintln(w, http.StatusText(http.StatusBadRequest),http.StatusBadRequest)
 		return
 	} 
@@ -79,21 +69,27 @@ func handleLogin(w http.ResponseWriter, r * http.Request) {
 	var dbPwd string;
 	var user_id int64;
 	var name string;
+	var role ROLE;
 
-	err := DB.QueryRow("select user_id, email, name, password from users where email=?",user.Email).Scan(&user_id, &user.Email, &name, &dbPwd)
+	err := DB.QueryRow("select user_id, email, name, password,role from users where email=?",email).Scan(&user_id, &email, &name, &dbPwd,&role)
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	if !CheckPasswordHash(user.password, dbPwd) {
+	
+	if !CheckPasswordHash(password, dbPwd) {
 		fmt.Println(err)
 		return
 	}
 
-	user.UserId = user_id
-	user.Name = name
+	user := User {
+		UserId:user_id,
+		Name:name,
+		Email:email,
+		Role:role,		
+	}
 
 	session , err := store.Get(r, AUTH_COOKIE)
  
@@ -103,26 +99,14 @@ func handleLogin(w http.ResponseWriter, r * http.Request) {
 }
 
 func me(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, AUTH_COOKIE)
-	user_id, ok := session.Values[AUTH_COOKIE].(int64)
-	
-	if  !ok || user_id == -1 {
-		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return
-	}
- 
-	user := LoginUser {
-		UserId:user_id,
-	}
+	user, ok := r.Context().Value(AUTH_COOKIE).(*User)
 
-	err := DB.QueryRow("select email, name from users where user_id=?",user_id).Scan(&user.Email, &user.Name)
-	
-	if err != nil {
+	if  !ok || user == nil {
 		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 		return
 	}
 
-	json.NewEncoder(w).Encode(struct {User LoginUser} {user})
+	json.NewEncoder(w).Encode(user)
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {

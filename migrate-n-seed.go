@@ -68,7 +68,12 @@ func main() {
 	// User Seed
 	{	
 		password,_ := HashPassword("123456")
-		users := []User {
+		users := [] struct {
+			name     string
+			email    string
+			password string
+			role     string
+		} {
 			{ email:"admin@gmail.com",password:password,name:"samad" },
 			{ email:"user1@gmail.com",password:password,name:"samad1" },
 			{ email:"user2@gmail.com",password:password,name:"samad2" },
@@ -109,7 +114,12 @@ func main() {
 		}
 
 		for id := range users {
-			post := Post {
+			post := struct {
+				title string
+				body string
+				slug string
+				author_id int 
+			} {
 				title: fmt.Sprintf("User %d post",id),
 				slug: fmt.Sprintf("user-%d-post",id),
 				body : fmt.Sprintf("This is the body of post by User %d.", id),
