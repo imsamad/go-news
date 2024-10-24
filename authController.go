@@ -6,24 +6,123 @@ import (
 	"encoding/json"
 )
 
+type LoginPageData struct {
+	Success string
+	Fail string
+	EmailMessage string
+	PasswordMessage string
+	AuthData AuthData
+}
+
+type SignupPageData struct {
+	Success string
+	Fail string
+	EmailMessage string
+	PasswordMessage string
+	NameMessage string
+	AuthData AuthData
+}
+
+ 
+// Load all templates globally and handle errors
+var (
+    loginPageTmpl    = mustParseTemplate("views/login.tmpl")
+    signupPageTmpl   = mustParseTemplate("views/signup.tmpl")
+    userPanelPageTmpl = mustParseTemplate("views/me.tmpl")
+)
+
+func userPanelPage(w http.ResponseWriter, r *http.Request) {
+
+	user, _ := r.Context().Value(AUTH_COOKIE).(*User)
+
+	posts := getAllMyPostsUtil(user.UserId)
+
+	userPanelPageTmpl.Execute(w, struct{IsAdminPage bool
+		 AuthData AuthData 
+		Posts []Post}{AuthData:fetchAuthData(r),Posts:posts,IsAdminPage:false})
+
+
+}
+
+func loginPage(w http.ResponseWriter, r *http.Request) {
+	loginPageTmpl.Execute(w, LoginPageData {
+		Success: "",
+		Fail :"",
+		EmailMessage :"",
+		PasswordMessage:"",
+		AuthData:AuthData{},
+	})
+}
+
+func signupPage(w http.ResponseWriter, r *http.Request) {
+	signupPageTmpl.Execute(w, SignupPageData {
+		Success: "",
+		Fail :"",
+		EmailMessage :"",
+		PasswordMessage:"",
+		NameMessage:"",
+		AuthData:AuthData{},
+
+	})
+}
+
 func signup(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	name := r.FormValue("name")
 	password := r.FormValue("password")
 	
-	if email == "" || password == "" || name == "" {
-		fmt.Fprintln(w, http.StatusText(http.StatusBadRequest),http.StatusBadRequest)
+ 
+	if email == "" {
+		signupPageTmpl.Execute(w, SignupPageData {
+			Success: "",
+			Fail :"",
+			EmailMessage : "Email is required!",
+			PasswordMessage: "",
+			NameMessage:"",			AuthData:AuthData{},
+
+		})
 		return
 	} 
+
+	if password == "" {
+		signupPageTmpl.Execute(w, SignupPageData {
+			Success: "",
+			Fail :"",
+			EmailMessage : "",
+			PasswordMessage:"Password is required",
+			NameMessage:"",			AuthData:AuthData{},
+
+		})
+		return
+		} 
+
+		if name == "" {
+			signupPageTmpl.Execute(w, SignupPageData {
+				Success: "",
+				Fail :"",
+				EmailMessage : "",
+				PasswordMessage:"",
+				NameMessage:"Name is required",			AuthData:AuthData{},
+
+			})
+			return
+			} 
+		
 
 	alreadyExistedQuery := `
 		select email from users where email=?
 	`
 
 	notExist := DB.QueryRow(alreadyExistedQuery, email).Scan(&email)
-	// fmt.Println("alreadyExistedUser: ",alreadyExistedUser)	
 	if notExist == nil {
-		fmt.Fprintln(w, "Email already exist",404)
+		signupPageTmpl.Execute(w, SignupPageData {
+			Success: "",
+			Fail :"",
+			EmailMessage : "Email already exist!",
+			PasswordMessage: "",
+			NameMessage:"",			AuthData:AuthData{},
+
+		})
 		return
 	}	
 
@@ -36,16 +135,29 @@ func signup(w http.ResponseWriter, r *http.Request) {
 
 
 	if err != nil {
-		fmt.Println("err: ",err)
-		fmt.Fprintln(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		signupPageTmpl.Execute(w, SignupPageData {
+			Success: "",
+			Fail :"Plz try again",
+			EmailMessage : "",
+			PasswordMessage: "",
+			NameMessage:"",			AuthData:AuthData{},
+
+		})
 		return
 	}	
 	
 	id, err := newUser.LastInsertId()
 	
 	if err != nil {
-		fmt.Println("err fetching id of newly created user: ",err)
-		fmt.Fprintln(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+
+		signupPageTmpl.Execute(w, SignupPageData {
+			Success: "",
+			Fail :"Plz try again",
+			EmailMessage : "",
+			PasswordMessage: "",
+			NameMessage:"",			AuthData:AuthData{},
+
+		})
 		return
 	}
 	
@@ -53,18 +165,37 @@ func signup(w http.ResponseWriter, r *http.Request) {
 
 	session.Values[AUTH_COOKIE] = id
 	session.Save(r, w)
-	 
-	json.NewEncoder(w).Encode(User {Name:name, Email:email, UserId:id, Role: "USER"})
+	
+	http.Redirect(w,r,"/me",http.StatusFound)
 }
 
 func handleLogin(w http.ResponseWriter, r * http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
-	
-	if email == "" || password == "" {
-		fmt.Fprintln(w, http.StatusText(http.StatusBadRequest),http.StatusBadRequest)
+
+	if email == "" {
+		loginPageTmpl.Execute(w, LoginPageData {
+			Success: "",
+			Fail :"",
+			EmailMessage : "Email is required!",
+			PasswordMessage: "",
+			AuthData:AuthData{},
+
+		})
 		return
 	} 
+
+	if password == "" {
+		loginPageTmpl.Execute(w, LoginPageData {
+			Success: "",
+			Fail :"",
+			EmailMessage : "",
+			PasswordMessage:"Password is required",
+			AuthData:AuthData{},
+
+		})
+		return
+		} 
 	
 	var dbPwd string;
 	var user_id int64;
@@ -74,17 +205,31 @@ func handleLogin(w http.ResponseWriter, r * http.Request) {
 	err := DB.QueryRow("select user_id, email, name, password,role from users where email=?",email).Scan(&user_id, &email, &name, &dbPwd,&role)
 
 	if err != nil {
-		fmt.Println(err)
+		loginPageTmpl.Execute(w, LoginPageData {
+			Success: "",
+			Fail :"Email does not exist",
+			EmailMessage : "",
+			PasswordMessage: "",
+			AuthData:AuthData{},
+
+		})
 		return
 	}
 
 	
 	if !CheckPasswordHash(password, dbPwd) {
-		fmt.Println(err)
+		loginPageTmpl.Execute(w, LoginPageData {
+			Success: "",
+			Fail :"",
+			EmailMessage : "",
+			PasswordMessage: "Password is incorrect!",
+			AuthData:AuthData{},
+
+		})
 		return
 	}
 
-	user := User {
+	_ = User {
 		UserId:user_id,
 		Name:name,
 		Email:email,
@@ -95,7 +240,9 @@ func handleLogin(w http.ResponseWriter, r * http.Request) {
  
 	session.Values[AUTH_COOKIE] = user_id
 	session.Save(r,w)
-	json.NewEncoder(w).Encode(user)
+	// json.NewEncoder(w).Encode(user)
+	http.Redirect(w,r,"/me",http.StatusFound)
+
 }
 
 func me(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +261,7 @@ func logout(w http.ResponseWriter, r *http.Request) {
 
 	session.Values[AUTH_COOKIE] = -1
 	session.Save(r, w)
-	
+	http.Redirect(w,r,"/auth/login",http.StatusFound)
 	fmt.Fprintln(w, "Logged out successfully!")
 }
 

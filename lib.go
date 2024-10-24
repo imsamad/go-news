@@ -1,4 +1,5 @@
 package main
+
 import (	
 	"golang.org/x/crypto/bcrypt"
 	"math/big"
@@ -6,7 +7,73 @@ import (
 	"strings"
 	"crypto/rand"
 	"fmt"
+	"net/http"
+	"errors"
+	"html/template"
+	"os"
 )
+
+type TMiddleware func(http.HandlerFunc) http.HandlerFunc
+
+func middlewares(f http.HandlerFunc, ms ...TMiddleware) http.HandlerFunc  {
+	for _, m := range ms {
+		f = m(f)
+	}
+	return f
+}
+
+func fetchAuthData(r *http.Request) AuthData {
+	user, err := fetchSession(r)
+	
+	if  err != nil{
+		return AuthData{
+			IsLoggedIn:false,
+			IsAdmin:false,
+		}
+	}
+	
+	return AuthData{
+		IsLoggedIn:true,
+		IsAdmin:user.Role == "ADMIN",
+	}
+}
+
+func fetchSession (r *http.Request) (User, error)  {
+	// if authMiddleware already called, on calling this fun reading from context
+	// would avoid re-query user from db
+
+	userPointer, ok := r.Context().Value(AUTH_COOKIE).(*User)
+	
+	if  ok && userPointer != nil {
+		return *userPointer, nil
+	}
+	
+	session, _ := store.Get(r, AUTH_COOKIE)
+	user_id, ok := session.Values[AUTH_COOKIE].(int64)
+
+	if user_id == -1 || !ok {
+		return User{}, errors.New("not logged in")
+	} 
+	
+	var user User;
+
+	err := DB.QueryRow("select user_id,email,name,role from users where user_id=?",user_id).Scan(&user.UserId,&user.Email,&user.Name,&user.Role)
+
+	if err != nil {
+		return User{}, errors.New("not logged in")
+	}
+
+	return user, nil
+}
+
+func mustParseTemplate(filepath string) *template.Template {
+    tmpl, err := template.ParseFiles(filepath)
+    if err != nil {
+		fmt.Println("reason being unable to load template file: ",err)
+		os.Exit(1)
+	}
+    return tmpl
+}
 
 func HashPassword(password string) (string, error) {
     bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)

@@ -5,10 +5,12 @@ import (
     "database/sql"
     _ "github.com/go-sql-driver/mysql"
 	"os"
+	"golang.org/x/crypto/bcrypt"
+
 )
 
 func main() {
-	db,err := sql.Open("mysql","root:root@(127.0.0.1:3306)/news1")
+	db,err := sql.Open("mysql","root:root@(127.0.0.1:3306)/news4")
 
 	if err != nil {
 		fmt.Println("unable to connect to mysql")
@@ -67,22 +69,30 @@ func main() {
 
 	// User Seed
 	{	
-		password,_ := HashPassword("123456")
+		passwordHashedBytes, err := bcrypt.GenerateFromPassword([]byte("123456"), 14)
+
+		if err != nil {
+			fmt.Println("unable to hash pwd, that wht exiting out...")
+			os.Exit(1)
+		}
+
+		password := string(passwordHashedBytes);
+		
 		users := [] struct {
 			name     string
 			email    string
 			password string
 			role     string
 		} {
-			{ email:"admin@gmail.com",password:password,name:"samad" },
-			{ email:"user1@gmail.com",password:password,name:"samad1" },
-			{ email:"user2@gmail.com",password:password,name:"samad2" },
-			{ email:"user3@gmail.com",password:password,name:"samad3" },
-			{ email:"user4@gmail.com",password:password,name:"samad4" },
+			{ email:"admin@gmail.com",password:password,name:"samad",role:"ADMIN" },
+			{ email:"user1@gmail.com",password:password,name:"samad1",role:"USER" },
+			{ email:"user2@gmail.com",password:password,name:"samad2",role:"USER"},
+			{ email:"user3@gmail.com",password:password,name:"samad3" ,role:"USER"},
+			{ email:"user4@gmail.com",password:password,name:"samad4",role:"USER" },
 		}
 
 		for _,user := range users {
-			_, err := db.Exec("insert into users (name, email,password) values (?,?,?)",user.name, user.email, user.password)
+			_, err := db.Exec("insert into users (name, email,password,role) values (?,?,?,?)",user.name, user.email, user.password,user.role)
 			if err != nil {
 				fmt.Println("error inserting row of :",user.email)
 				fmt.Println(err)
@@ -114,26 +124,29 @@ func main() {
 		}
 
 		for id := range users {
-			post := struct {
-				title string
-				body string
-				slug string
-				author_id int 
-			} {
-				title: fmt.Sprintf("User %d post",id),
-				slug: fmt.Sprintf("user-%d-post",id),
-				body : fmt.Sprintf("This is the body of post by User %d.", id),
-				author_id: id,
+			for i:=0; i < 10; i++ {
+				post := struct {
+					title string
+					body string
+					slug string
+					author_id int 
+				} {
+					title: fmt.Sprintf("User %d post - %d",id,i),
+					slug: fmt.Sprintf("user-%d-post-%d",id,i),
+					body : fmt.Sprintf("This is the body of post by User %d.", id),
+					author_id: id,
+				}
+	
+				_, err := db.Exec("insert into posts (title, body, slug, author_id) values (?,?,?,?)",post.title, post.body, post.slug, post.author_id)
+	
+				if err != nil {
+					fmt.Println("error while seeding post")
+					fmt.Println(err)
+				}
+	
+				fmt.Println(post)
+	
 			}
-
-			_, err := db.Exec("insert into posts (title, body, slug, author_id) values (?,?,?,?)",post.title, post.body, post.slug, post.author_id)
-
-			if err != nil {
-				fmt.Println("error while seeding post")
-				fmt.Println(err)
-			}
-
-			fmt.Println(post)
 		}
 
 		fmt.Println("users and post seeded")
