@@ -12,6 +12,8 @@ make docker
 or
 docker compose up -d
 ```
+Note: MySQL container make take around 30sec for init, please wait for 30sec then run next cmds
+
 #### Seed the db
 ```sh
 make seed 
