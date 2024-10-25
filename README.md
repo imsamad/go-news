@@ -2,6 +2,10 @@
 
 A web-based news application where users can create, delete, and edit news, while the admin has full control over managing all news posts. The system uses email-based authentication.
 
+### Overview
+
+[Watch the video](./demovideo.webm)
+
 ### Setup guide
 
 After cloning the repo
