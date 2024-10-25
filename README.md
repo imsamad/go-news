@@ -23,6 +23,8 @@ cd seed && go run .
 
 #### Launch the app
 ```sh
+make run
+or
 cd app && go run .
 ```
 
