@@ -1,22 +1,23 @@
-package main
+package middlewares
 
 import (
-	"net/http"
 	"context"
+	"go-news/consts"
+	"go-news/lib"
+	"net/http"
 )
 
 
-
-func authMiddleware() TMiddleware {
+func AuthMiddleware() TMiddleware {
 	return func (f http.HandlerFunc) http.HandlerFunc {
 		return func (w http.ResponseWriter, r *http.Request) {
-			user, err := fetchSession(r)
+			user, err := lib.FetchSession(r)
 			if  err != nil{
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
 			
-			ctx := context.WithValue(r.Context(), AUTH_COOKIE, &user)
+			ctx := context.WithValue(r.Context(), consts.AUTH_COOKIE, &user)
 		 
 			f(w, r.WithContext(ctx))
 		}	
@@ -24,10 +25,10 @@ func authMiddleware() TMiddleware {
 }
 
 
-func adminMiddleware() TMiddleware {
+func AdminMiddleware() TMiddleware {
 	return func (f http.HandlerFunc) http.HandlerFunc {
 		return func (w http.ResponseWriter, r *http.Request) {
-			user, err := fetchSession(r)
+			user, err := lib.FetchSession(r)
 			if  err != nil{
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
@@ -38,25 +39,19 @@ func adminMiddleware() TMiddleware {
 				return
 			}
 			
-			ctx := context.WithValue(r.Context(), AUTH_COOKIE, &user)
+			ctx := context.WithValue(r.Context(), consts.AUTH_COOKIE, &user)
 		 
 			f(w, r.WithContext(ctx))
 		}	
 	}
 }
 
-func isAdmin(r *http.Request) bool {
-	user,ok := r.Context().Value(AUTH_COOKIE).(*User)
-	if user == nil || !ok || user.Role != "ADMIN" {
-		return false
-	}	
-	return true
-}
 
-func guestMiddleware() TMiddleware {
+
+func GuestMiddleware() TMiddleware {
 	return func (f http.HandlerFunc) http.HandlerFunc {
 		return func (w http.ResponseWriter, r *http.Request) {
-			_, err := fetchSession(r)
+			_, err := lib.FetchSession(r)
 			
 			if  err != nil{
 				f(w,r)

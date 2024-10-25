@@ -7,9 +7,3 @@ services:
       MYSQL_DATABASE: news_db
     ports:
     - 3306:3306
-
-  mq:
-    image: redis
-    container_name: mq
-    ports:
-      - 6379:6379

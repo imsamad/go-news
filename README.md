@@ -1,12 +1,35 @@
-migrations
-home page
+# Go News
 
-signup page
-login page
-create post
-edit post
-delete post
+A web-based news application where users can create, delete, and edit news, while the admin has full control over managing all news posts. The system uses email-based authentication.
+
+### Setup guide
+
+After cloning the repo
+#### Spin up MySql container
 
 ```sh
-go run migrate-n-seed.go types.go lib.go
+make docker
+or
+docker compose up -d
+```
+#### Seed the db
+```sh
+make seed 
+or
+cd seed && go run .
+```
+
+#### Launch the app
+```sh
+cd app && go run .
+```
+
+Application would be up and running on port 3000
+
+Test credentials
+
+```js
+Users: (user1, user2, user3, user4)@email.com,
+Admin: admin@gmail.com 
+Password: 123456
 ```

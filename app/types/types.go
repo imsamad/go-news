@@ -1,9 +1,8 @@
-package main
+package types
 
 import "time"
 
 type ROLE string
-
 const (
 	USER ROLE = "USER"
 	ADMIN ROLE = "ADMIN"

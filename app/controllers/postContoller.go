@@ -1,120 +1,46 @@
-package main
+package controllers
 
 import (
-	"net/http"
 	"encoding/json"
-	"github.com/gorilla/mux"
 	"fmt"
+	"go-news/consts"
+	"go-news/database"
+	"go-news/lib"
+	"go-news/types"
+	"go-news/views"
+	"net/http"
+
+	"github.com/gorilla/mux"
 )
+ 
 
-var (
-    postFormTmpl    = mustParseTemplate("views/post_form.tmpl")
-)
 
-func getAllPostsUtil() []Post {
-	var posts []Post
 
-	rows, err := DB.Query(`
-		select p.post_id, p.title, p.slug, p.body, p.author_id, u.name
-		from posts p
-		inner join users u
-		on p.author_id=u.user_id
-	`)
 
-	defer rows.Close()
+func CreatePost(w http.ResponseWriter, r * http.Request) {
 
-	if err != nil {
-		return posts
-	}
-
-	for rows.Next() {
-		var post Post
-		_ = rows.Scan(&post.PostId, &post.Title, &post.Slug, &post.Body, &post.AuthorId, &post.Author)
-
-		posts = append(posts, post)
-	}
-
-	return posts
-}
-
-func getAllPostsExceptUtil(user_id int64) []Post {
-	var posts []Post
-
-	rows, err := DB.Query(`
-		select p.post_id, p.title, p.slug, p.body, p.author_id, u.name
-		from posts p
-		inner join users u
-		on p.author_id=u.user_id
-		where not p.author_id=? 
-	`,user_id)
-
-	defer rows.Close()
-
-	if err != nil {
-		return posts
-	}
-
-	for rows.Next() {
-		var post Post
-		_ = rows.Scan(&post.PostId, &post.Title, &post.Slug, &post.Body, &post.AuthorId, &post.Author)
-
-		posts = append(posts, post)
-	}
-
-	return posts
-}
-
-func getAllMyPostsUtil(user_id int64) []Post {
-	var posts []Post
-
-	rows, err := DB.Query(`
-		select p.post_id, p.title, p.slug, p.body, p.author_id, u.name
-		from posts p
-		inner join users u
-		on p.author_id=u.user_id
-		where user_id=?
-	`,user_id)
-
-	defer rows.Close()
-
-	if err != nil {
-		return posts
-	}
-
-	for rows.Next() {
-		var post Post
-		_ = rows.Scan(&post.PostId, &post.Title, &post.Slug, &post.Body, &post.AuthorId, &post.Author)
-
-		posts = append(posts, post)
-	}
-
-	return posts
-}
-
-func createPost(w http.ResponseWriter, r * http.Request) {
-
-	user, _ := r.Context().Value(AUTH_COOKIE).(*User)
+	user, _ := r.Context().Value(consts.AUTH_COOKIE).(*types.User)
 	
-	post := Post {
+	post := types.Post {
 		Title:r.FormValue("title"),
 		Body:r.FormValue("body"),
 		AuthorId:user.UserId,
-		Slug:Slugify(r.FormValue("title")),
+		Slug:lib.Slugify(r.FormValue("title")),
 	}
 
 
 	if post.Title == ""{
-		postFormTmpl.Execute(w, struct {
-			AuthData AuthData
-			Post Post
+		views.PostFormTmpl.Execute(w, struct {
+			AuthData types.AuthData
+			Post types.Post
 			IsEditPage bool
 			Success string
 			Fail string
 			TitleMessage string
 			BodyMessage string
 			}{
-				AuthData:fetchAuthData(r),
-				Post:Post{},
+				AuthData:lib.FetchAuthData(r),
+				Post:types.Post{},
 				IsEditPage:false,
 				Success:"",
 				Fail:"",
@@ -127,17 +53,17 @@ func createPost(w http.ResponseWriter, r * http.Request) {
 	}
 
 	if  post.Body == ""  {
-		postFormTmpl.Execute(w, struct {
-			AuthData AuthData
-			Post Post
+		views.PostFormTmpl.Execute(w, struct {
+			AuthData types.AuthData
+			Post types.Post
 			IsEditPage bool
 			Success string
 			Fail string
 			TitleMessage string
 			BodyMessage string
 			}{
-				AuthData:fetchAuthData(r),
-				Post:Post{},
+				AuthData:lib.FetchAuthData(r),
+				Post:types.Post{},
 				IsEditPage:false,
 				Success:"",
 				Fail:"",
@@ -150,20 +76,20 @@ func createPost(w http.ResponseWriter, r * http.Request) {
 	createPostQuery := `
 	insert into posts (title,body,author_id,slug) values (?,?,?,?);
 	`
-	createPost, err := DB.Exec(createPostQuery, post.Title, post.Body, post.AuthorId, post.Slug)
+	_, err := database.GetDB().Exec(createPostQuery, post.Title, post.Body, post.AuthorId, post.Slug)
 
 	if err != nil {
-		postFormTmpl.Execute(w, struct {
-			AuthData AuthData
-			Post Post
+		views.PostFormTmpl.Execute(w, struct {
+			AuthData types.AuthData
+			Post types.Post
 			IsEditPage bool
 			Success string
 			Fail string
 			TitleMessage string
 			BodyMessage string
 			}{
-				AuthData:fetchAuthData(r),
-				Post:Post{},
+				AuthData:lib.FetchAuthData(r),
+				Post:types.Post{},
 				IsEditPage:false,
 				Success:"",
 				Fail:"Unable to create,plz try again!",
@@ -173,23 +99,23 @@ func createPost(w http.ResponseWriter, r * http.Request) {
 			return
 	}
 
-	createPostId, _ := createPost.LastInsertId()
-	post.PostId = createPostId
+	// createPostId, _ := createPost.LastInsertId()
+	// post.PostId = createPostId
 	// json.NewEncoder(w).Encode(post)
 
 	http.Redirect(w,r,"/me",http.StatusFound)
 }
 
-func postEditPage(w http.ResponseWriter, r *http.Request) {
+func PostEditPage(w http.ResponseWriter, r *http.Request) {
 	post_id := mux.Vars(r)["post_id"]
-	author, _ := r.Context().Value(AUTH_COOKIE).(*User)
+	author, _ := r.Context().Value(consts.AUTH_COOKIE).(*types.User)
 
-	var post Post
+	var post types.Post
 
-	isUserAdmin := isAdmin(r)
+	isUserAdmin :=lib.IsAdmin(r)
 
 	if isUserAdmin {
-		err := DB.QueryRow(`
+		err := database.GetDB().QueryRow(`
 		select post_id, title, body, author_id
 		from posts
 		where post_id=?
@@ -200,7 +126,7 @@ func postEditPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	} else {
-		err := DB.QueryRow(`
+		err := database.GetDB().QueryRow(`
 		select post_id, title, body, author_id
 		from posts
 		where post_id=? and author_id=?
@@ -216,16 +142,16 @@ func postEditPage(w http.ResponseWriter, r *http.Request) {
 
 
 
-	postFormTmpl.Execute(w, struct {
-		AuthData AuthData
-		Post Post
+	views.PostFormTmpl.Execute(w, struct {
+		AuthData types.AuthData
+		Post types.Post
 		IsEditPage bool
 		Success string
 		Fail string
 		TitleMessage string
 		BodyMessage string
 		}{
-			AuthData:fetchAuthData(r),
+			AuthData:lib.FetchAuthData(r),
 			Post:post,
 			IsEditPage:true,
 			Success:"",
@@ -233,28 +159,27 @@ func postEditPage(w http.ResponseWriter, r *http.Request) {
 			TitleMessage:"",
 			BodyMessage:"",
 		})
-		return
 }
 
-func updatePost(w http.ResponseWriter, r *http.Request) {
-	user, _ := r.Context().Value(AUTH_COOKIE).(*User)
+func UpdatePost(w http.ResponseWriter, r *http.Request) {
+	user, _ := r.Context().Value(consts.AUTH_COOKIE).(*types.User)
 	user_id := user.UserId
 	title := r.FormValue("title")
 	body := r.FormValue("body")
 	post_id := mux.Vars(r)["post_id"]
 
 	if title == "" {
-		postFormTmpl.Execute(w, struct {
-			AuthData AuthData
-			Post Post
+		views.PostFormTmpl.Execute(w, struct {
+			AuthData types.AuthData
+			Post types.Post
 			IsEditPage bool
 			Success string
 			Fail string
 			TitleMessage string
 			BodyMessage string
 			}{
-				AuthData:fetchAuthData(r),
-				Post:Post{Title:title, Body:body,},
+				AuthData:lib.FetchAuthData(r),
+				Post:types.Post{Title:title, Body:body,},
 				IsEditPage:true,
 				Success:"",
 				Fail:"",
@@ -265,17 +190,17 @@ func updatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if  body == ""  {
-		postFormTmpl.Execute(w, struct {
-			AuthData AuthData
-			Post Post
+		views.PostFormTmpl.Execute(w, struct {
+			AuthData types.AuthData
+			Post types.Post
 			IsEditPage bool
 			Success string
 			Fail string
 			TitleMessage string
 			BodyMessage string
 			} {
-				AuthData:fetchAuthData(r),
-				Post:Post{Title:title,Body:body,},
+				AuthData:lib.FetchAuthData(r),
+				Post:types.Post{Title:title,Body:body,},
 				IsEditPage:true,
 				Success:"",
 				Fail:"",
@@ -286,17 +211,17 @@ func updatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	selectStm := "select post_id from posts where author_id=? and post_id=?";
 
-	isUserAdmin := isAdmin(r)
+	isUserAdmin := lib.IsAdmin(r)
 	var post_author_id int64
 	if isUserAdmin {
 		selectStm = "select post_id, author_id from posts where post_id=?";
-		err  := DB.QueryRow(selectStm,post_id).Scan(&post_id, &post_author_id)
+		err  := database.GetDB().QueryRow(selectStm,post_id).Scan(&post_id, &post_author_id)
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}		
 	} else {
-		err  := DB.QueryRow(selectStm,user_id,post_id).Scan(&post_id)
+		err  := database.GetDB().QueryRow(selectStm,user_id,post_id).Scan(&post_id)
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
@@ -305,20 +230,20 @@ func updatePost(w http.ResponseWriter, r *http.Request) {
  
 	updateStm := `update posts set title = ?, body = ? where post_id=?`
 
-	_, err := DB.Exec(updateStm, title, body, post_id)
+	_, err := database.GetDB().Exec(updateStm, title, body, post_id)
 
 	if err != nil {
-			postFormTmpl.Execute(w, struct {
-				AuthData AuthData
-				Post Post
+			views.PostFormTmpl.Execute(w, struct {
+				AuthData types.AuthData
+				Post types.Post
 				IsEditPage bool
 				Success string
 				Fail string
 				TitleMessage string
 				BodyMessage string
 				}{
-					AuthData:fetchAuthData(r),
-					Post:Post{},
+					AuthData:lib.FetchAuthData(r),
+					Post:types.Post{},
 					IsEditPage:false,
 					Success:"",
 					Fail:"Operation failed, please try again!",
@@ -342,46 +267,46 @@ func updatePost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func deletePost(w http.ResponseWriter, r * http.Request) {
-	author, _ :=  r.Context().Value(AUTH_COOKIE).(*User)
+func DeletePost(w http.ResponseWriter, r * http.Request) {
+	author, _ :=  r.Context().Value(consts.AUTH_COOKIE).(*types.User)
 	author_id := author.UserId
 
 	post_id := mux.Vars(r)["post_id"]
 
 	deleteStm := `delete from posts where post_id=? and author_id=?`
  
-	_, err := DB.Exec(deleteStm, post_id, author_id)
+	_, err := database.GetDB().Exec(deleteStm, post_id, author_id)
 
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	}
 }
 
-func deletePostByAdmin(w http.ResponseWriter, r * http.Request) {
+func DeletePostByAdmin(w http.ResponseWriter, r * http.Request) {
 
 	post_id := mux.Vars(r)["post_id"]
 
 	deleteStm := `delete from posts where post_id=?`
 
-	_, err := DB.Exec(deleteStm, post_id)
+	_, err := database.GetDB().Exec(deleteStm, post_id)
 
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	}
 }
 
-func postCreatePage(w http.ResponseWriter, r *http.Request) {
-	postFormTmpl.Execute(w, struct {
-		AuthData AuthData
-		Post Post
+func PostCreatePage(w http.ResponseWriter, r *http.Request) {
+	views.PostFormTmpl.Execute(w, struct {
+		AuthData types.AuthData
+		Post types.Post
 		IsEditPage bool
 		Success string
 		Fail string
 		TitleMessage string
 		BodyMessage string
 		}{
-			AuthData:fetchAuthData(r),
-			Post:Post{},
+			AuthData:lib.FetchAuthData(r),
+			Post:types.Post{},
 			IsEditPage:false,
 			Success:"",
 			Fail:"",
@@ -391,7 +316,7 @@ func postCreatePage(w http.ResponseWriter, r *http.Request) {
 		})
 }
 
-func getPostById(w http.ResponseWriter, r * http.Request) {
+func GetPostById(w http.ResponseWriter, r * http.Request) {
 	post_id := mux.Vars(r)["post_id"]
 
 	selectStm := `select p.post_id, p.title, p.slug, p.body, p.author_id, u.name
@@ -401,8 +326,8 @@ func getPostById(w http.ResponseWriter, r * http.Request) {
 		where p.post_id=?
 	`;
 	
-	var post Post;
-	err := DB.QueryRow(selectStm, post_id).Scan(&post.PostId, &post.Title, &post.Slug, &post.Body, &post.AuthorId, &post.Author)
+	var post types.Post;
+	err := database.GetDB().QueryRow(selectStm, post_id).Scan(&post.PostId, &post.Title, &post.Slug, &post.Body, &post.AuthorId, &post.Author)
 	
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -412,7 +337,7 @@ func getPostById(w http.ResponseWriter, r * http.Request) {
 	json.NewEncoder(w).Encode(post)
 }
 
-func getPosts(w http.ResponseWriter, r * http.Request) {
-	json.NewEncoder(w).Encode(getAllPostsUtil())
+func GetPosts(w http.ResponseWriter, r * http.Request) {
+	json.NewEncoder(w).Encode(lib.GetAllPostsUtil())
 }
 
