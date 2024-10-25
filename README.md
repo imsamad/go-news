@@ -4,7 +4,7 @@ A web-based news application where users can create, delete, and edit news, whil
 
 ### Overview
 
-[Watch the video](./demovideo.mp4)
+[Watch the video](https://www.youtube.com/watch?v=qLsU5nq7Cnk)
 
 ### Setup guide
 
